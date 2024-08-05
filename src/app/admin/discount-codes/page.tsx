@@ -11,7 +11,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CheckCircle2, MoreVertical, XCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  Globe,
+  Infinity,
+  Minus,
+  MoreVertical,
+  XCircle,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,9 +26,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { formatCurrency, formatNumber } from "@/lib/formatters";
-import { ActiveToggleDropdownItem } from "../products/_components/ProductActions";
-import { Prisma } from "@prisma/client";
+import {
+  formatCurrency,
+  formatDateTime,
+  formatDiscountCode,
+  formatNumber,
+} from "@/lib/formatters";
+import { DiscountCode, Prisma } from "@prisma/client";
+import {
+  ActiveToggleDropdownItem,
+  DeleteDropdownItem,
+} from "./_components/DiscountCodeActions";
 
 const WHERE_EXPIRED: Prisma.DiscountCodeWhereInput = {
   OR: [
@@ -30,9 +45,23 @@ const WHERE_EXPIRED: Prisma.DiscountCodeWhereInput = {
   ],
 };
 
+const SELECT_FIELDS: Prisma.DiscountCodeSelect = {
+  id: true,
+  allProducts: true,
+  code: true,
+  discountAmount: true,
+  discountType: true,
+  expiresAt: true,
+  limit: true,
+  uses: true,
+  isActive: true,
+  products: { select: { name: true } },
+  _count: { select: { orders: true } },
+};
+
 function getExpiredDiscountCodes() {
   return db.discountCode.findMany({
-    // select: {},
+    select: SELECT_FIELDS,
     where: WHERE_EXPIRED,
     orderBy: { createdAt: "asc" },
   });
@@ -40,7 +69,7 @@ function getExpiredDiscountCodes() {
 
 function getUnexpiredDiscountCodes() {
   return db.discountCode.findMany({
-    // select: {},
+    select: SELECT_FIELDS,
     where: { NOT: WHERE_EXPIRED },
     orderBy: { createdAt: "asc" },
   });
@@ -59,17 +88,30 @@ export default async function DiscountCodePage() {
           <Link href="/admin/discount-codes/new">Add Coupon</Link>
         </Button>
       </div>
-      <DiscountCodeTable discountCodes={unexpiredDiscountCodes} />
+      <DiscountCodeTable
+        discountCodes={unexpiredDiscountCodes}
+        canDeactivated
+      />
 
       <div className="mt-8">
         <h2 className="text-xl font-bold">Expired Coupons</h2>
-        <DiscountCodeTable discountCodes={expiredDiscountCodes} />
+        <DiscountCodeTable discountCodes={expiredDiscountCodes} isInactive />
       </div>
     </>
   );
 }
 
-async function DiscountCodeTable() {
+type DiscountCodeTableProps = {
+  discountCodes: Awaited<ReturnType<typeof getExpiredDiscountCodes>>;
+  isInactive?: boolean;
+  canDeactivated?: boolean;
+};
+
+async function DiscountCodeTable({
+  discountCodes,
+  isInactive = false,
+  canDeactivated = false,
+}: DiscountCodeTableProps) {
   const products = await db.product.findMany({
     select: {
       id: true,
@@ -83,42 +125,64 @@ async function DiscountCodeTable() {
 
   if (products.length === 0) return <p>No Products Found</p>;
 
-  return null;
-
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead className="w-0">
-            <span className="sr-only">Available For Purchase</span>
+            <span className="sr-only">Is Active</span>
           </TableHead>
-          <TableHead>Name</TableHead>
-          <TableHead>Price</TableHead>
+          <TableHead>Code</TableHead>
+          <TableHead>Discount</TableHead>
+          <TableHead>Expires</TableHead>
+          <TableHead>Remaining Uses</TableHead>
           <TableHead>Orders</TableHead>
+          <TableHead>Products</TableHead>
           <TableHead className="w-0">
             <span className="sr-only">Actions</span>
           </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {products.map((product) => (
-          <TableRow key={product.id}>
+        {discountCodes.map((discountCode) => (
+          <TableRow key={discountCode.id}>
             <TableCell>
-              {product.isAvailableForPurchase ? (
+              {discountCode.isActive && !isInactive ? (
                 <>
                   <CheckCircle2 />
-                  <span className="sr-only">Available</span>
+                  <span className="sr-only">Active</span>
                 </>
               ) : (
                 <>
-                  <span className="sr-only">Unavailable</span>
+                  <span className="sr-only">Inactive</span>
                   <XCircle className="stroke-destructive" />
                 </>
               )}
             </TableCell>
-            <TableCell>{product.name}</TableCell>
-            <TableCell>{formatCurrency(product.priceInCents / 100)}</TableCell>
-            <TableCell>{formatNumber(product._count.orders)}</TableCell>
+            <TableCell>{discountCode.code}</TableCell>
+            <TableCell>{formatDiscountCode(discountCode)}</TableCell>
+            <TableCell>
+              {discountCode.expiresAt == null ? (
+                <Minus />
+              ) : (
+                formatDateTime(discountCode.expiresAt)
+              )}
+            </TableCell>
+            <TableCell>
+              {discountCode.limit == null ? (
+                <Infinity />
+              ) : (
+                formatNumber(discountCode.limit - discountCode.uses)
+              )}
+            </TableCell>
+            <TableCell>{formatNumber(discountCode._count.orders)}</TableCell>
+            <TableCell>
+              {discountCode.allProducts ? (
+                <Globe />
+              ) : (
+                discountCode.products.map((p) => p.name).join(", ")
+              )}
+            </TableCell>
             <TableCell>
               <DropdownMenu>
                 <DropdownMenuTrigger>
@@ -126,25 +190,21 @@ async function DiscountCodeTable() {
                   <span className="sr-only">Actions</span>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  <DropdownMenuItem asChild>
-                    <a download href={`/admin/products/${product.id}/download`}>
-                      Download
-                    </a>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href={`/admin/products/${product.id}/edit`}>
-                      Edit
-                    </Link>
-                  </DropdownMenuItem>
-                  {/* <ActiveToggleDropdownItem
-                    id={product.id}
-                    isAvailableForPurchase={product.isAvailableForPurchase}
-                  /> */}
-                  <DropdownMenuSeparator />
-                  {/* <DeleteDropdownItem
-                    id={product.id}
-                    disabled={product._count.orders > 0}
-                  /> */}
+                  {canDeactivated && (
+                    <>
+                      {" "}
+                      <ActiveToggleDropdownItem
+                        id={discountCode.id}
+                        isActive={discountCode.isActive}
+                      />
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+
+                  <DeleteDropdownItem
+                    id={discountCode.id}
+                    disabled={discountCode._count.orders > 0}
+                  />
                 </DropdownMenuContent>
               </DropdownMenu>
             </TableCell>

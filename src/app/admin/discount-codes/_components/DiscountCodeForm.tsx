@@ -21,6 +21,8 @@ export function DiscountCodeForm({
 }) {
   const [error, action] = useFormState(addDiscountCode, {});
   const [allProducts, setAllProducts] = useState(true);
+  const today = new Date();
+  today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
 
   return (
     <form action={action} className="space-y-8">
@@ -70,7 +72,7 @@ export function DiscountCodeForm({
 
       <div className="space-y-2">
         <label htmlFor="limit">Limit</label>
-        <Input type="number" id="limit" name="limi" />
+        <Input type="number" id="limit" name="limit" />
         <div className="text-muted-foreground">
           Leave blank for infinite uses
         </div>
@@ -80,10 +82,10 @@ export function DiscountCodeForm({
         <label htmlFor="expiresAt">Expiration</label>
         <Input
           type="datetime-local"
-          id="limit"
-          name="limi"
+          id="expiresAt"
+          name="expiresAt"
           className="w-max"
-          min={new Date().toJSON().split(":").slice(0, -1).join(":")}
+          min={today.toJSON().split(":").slice(0, -1).join(":")}
         />
         <div className="text-muted-foreground">
           Leave blank for no expiration
@@ -114,7 +116,7 @@ export function DiscountCodeForm({
           <div key={product.id} className="flex gap-2 items-center">
             <Checkbox
               id={product.id}
-              name="allProducts"
+              name="productIds"
               disabled={allProducts}
               value={product.id}
             />

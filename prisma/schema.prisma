@@ -62,7 +62,7 @@ model DiscountCode {
   discountType   DiscountCodeType
   uses           Int              @default(0)
   isActive       Boolean          @default(true)
-  allProdducts   Boolean          @default(false)
+  allProducts   Boolean          @default(false)
   createdAt      DateTime         @default(now())
   limit          Int?
   expiresAt      DateTime?

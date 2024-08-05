@@ -57,7 +57,7 @@ CREATE TABLE "DiscountCode" (
     "discountType" "DiscountCodeType" NOT NULL,
     "uses" INTEGER NOT NULL DEFAULT 0,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "allProdducts" BOOLEAN NOT NULL DEFAULT false,
+    "allProducts" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "limit" INTEGER,
     "expiresAt" TIMESTAMP(3),
